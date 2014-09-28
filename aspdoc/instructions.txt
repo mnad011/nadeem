@@ -1,0 +1,28 @@
+new JopInstr("jopsys_initctrl", 1, IMP_ASM, 1),			// 0xCB
+new Instruction("wrctrl", 0x103, 0, JmpType.NOP, StackType.NOP),
+jopsys_initctrl:
+			wrctrl
+			nop
+			pop
+			pop 
+			nop nxt
+
+
+			
+new JopInstr("jopsys_exectrl", 1, IMP_ASM, 1),			// 0xCD			
+new Instruction("stmainjpc", 0x006, 0, JmpType.NOP, StackType.POP),
+This instruction stores the content of TOS into register mainjpc.
+new Instruction("ldT", 0x0e0 + 3, 0, JmpType.NOP, StackType.PUSH),
+It pushes the content of temoporary regsiter T on the TOP of stack. 
+This instruction genarates control signal sel_lmux with value 110 
+which selects T to be pushed on TOS.
+new Instruction("ldctrlpcT", 0x106, 0, JmpType.NOP, StackType.NOP),
+			new Instruction("toggle", 0x107, 0, JmpType.NOP, StackType.NOP),
+jopsys_exectrl:
+			ldjpc
+			stmainjpc
+			ldctrlpc
+			jbr
+			toggle
+			nop
+			nop nxt

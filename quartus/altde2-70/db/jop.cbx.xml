@@ -1,0 +1,9 @@
+<?xml version="1.0" ?>
+<LOG_ROOT>
+	<PROJECT NAME="jop">
+		<CBX_INST_ENTRY INSTANCE_NAME="|jop|jopcpu:cpu|core:core|bcfetch:bcf|jbc:mch|altsyncram:alt_jbc" CBX_FILE_NAME="altsyncram_5pi1.tdf"/>
+		<CBX_INST_ENTRY INSTANCE_NAME="|jop|jopcpu:cpu|core:core|fetch:fch|rom:mcrom|lpm_rom:cmp_rom|altrom:srom|altsyncram:rom_block" CBX_FILE_NAME="altsyncram_mh11.tdf"/>
+		<CBX_INST_ENTRY INSTANCE_NAME="|jop|jopcpu:cpu|core:core|stack:stk|ram:stkram|lpm_ram_dp:cmp_ram|altdpram:sram" CBX_FILE_NAME="dpram_eob1.tdf"/>
+		<CBX_INST_ENTRY INSTANCE_NAME="|jop|jopcpu:cpu|core:core|stack:stk|ram:stkram|lpm_ram_dp:cmp_ram|altdpram:sram|altsyncram:ram_block" CBX_FILE_NAME="altsyncram_7ts1.tdf"/>
+	</PROJECT>
+</LOG_ROOT>

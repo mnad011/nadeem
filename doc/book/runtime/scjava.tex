@@ -1,0 +1,204 @@
+
+\section{A Profile for Safety Critical Java}
+\label{sec:scjava}
+
+The proposed profile is an refinement of the profile described in
+Section~\ref{sec:rtprof}. Further development of applications on JOP
+shall be based on this profile and the current applications (e.g.\
+\"OBB bg and Lift) should be migrated to this profile.
+
+\subsection{Introduction}
+
+Safety-critical Java (SCJ) builds upon a broad research base on using
+Java (and Ada) for hard real-time systems, sometimes also called high
+integrity systems. The Ravenscar profile defines a subset of Ada to
+support development of safety-critical systems~\cite{289525}. Based
+on the concepts of Ravenscar Ada a restriction of the RTSJ was first
+proposed in \cite{Pusch01}. These restrictions are similar to SCJ
+level 1 without the mission concept. The idea was further extended in
+\cite{ravenscar:java} and named the Ravenscar Java profile (RJ). RJ
+is an extended subset of RTSJ that removes features considered unsafe
+for high integrity systems. Another profile for safety-critical
+systems was proposed within the EU project HIJA \cite{hija}.
+
+PERC Pico from Aonix~\cite{perc:pico:um} defines a Java environment
+for hard real-time systems. PERC Pico defines its own class hierarchy
+for real-time Java classes which are based on the RTSJ libraries, but
+are not a strict subset thereof. PERC Pico introduces stack-allocated
+scopes, an elaborate annotation system, and an integrated static
+analysis system to verify scope safety and analyze memory and CPU
+time resource requirements for hard real-time software components.
+Some of the annotations used to describe the libraries of the SCJ are
+derived indirectly from the annotation system used in PERC Pico.
+
+Another definition of a profile for safety-critical Java was
+published in \cite{jop:scjava}. In contrast to RJ the authors of that
+profile argue for new classes instead of reusing RTSJ based classes
+to avoid inheriting unsafe RTSJ features and to simplify the class
+hierarchy. A proposal for mission modes within the former profile
+\cite{jop:scjmodes} permits recycling CPU time budgets for different
+phases of the application. Compared to the mission concept of SCJ
+that proposal allows periodic threads to vote against the shutdown of
+a mission. The concept of mission memory is not part of that
+proposal.
+
+
+In this chapter we focus on the safety-critical Java (SCJ)
+specification, a new standard for safety critical applications
+developed by the JSR 302 expert group \cite{scj:as:proceedings}. We
+should note that the JSR 302 has not been finalized, thus we present
+the version from \cite{jop:scjmodes}. When the JSR 302 stabilizes it
+will be implemented for JOP and will be the future version of the
+real-time profile.
+
+% Text from the SCJ paper
+%This draft JSR 302 standard, like previous work, defines a strict
+%subset of the RTSJ which is intended to provide a programming model
+%suited to a large class of safety critical applications. Restricting
+%the features of the RTSJ is intended to make programs more amenable
+%to worst case analysis and manual or automatic validation. The SCJ
+%is structured in three increasingly expressive levels: Level 0
+%restricts applications to a single threaded cyclic executive, level
+%1 assumes a single ``mission'' with a static thread assignment, and
+%level 2 is a multi-mission model with dynamic thread creation. This
+%paper focuses on level 1 which is expected to cover a large number
+%of existing SC applications. It should be noted that while all
+%levels are designed to run on a vanilla RTSJ VM, it is expected that
+%vendors will provided implementations that are optimized for the
+%particular features of each level.
+
+\begin{lstlisting}[float=t!,caption={Periodic thread definition for SCJ},
+label=lst:scjdef]
+
+package javax.safetycritical;
+
+public abstract class RealtimeThread {
+
+    protected RealtimeThread(RelativeTime period,
+        RelativeTime deadline,
+        RelativeTime offset, int memSize)
+
+    protected RealtimeThread(String event,
+        RelativeTime minInterval,
+        RelativeTime deadline, int memSize)
+
+    abstract protected boolean run();
+
+    protected boolean cleanup() {
+        return true;
+    }
+}
+
+public abstract class PeriodicThread
+        extends RealtimeThread {
+
+    public PeriodicThread(RelativeTime period,
+        RelativeTime deadline,
+        RelativeTime offset, int memSize)
+
+    public PeriodicThread(RelativeTime period)
+}
+\end{lstlisting}
+
+\subsection{SCJ Level 1}
+
+Level 1 of the SCJ requires that all threads be defined during an
+initial \emph{initialization} phase. This phase is run only once at
+virtual machine startup. The second phase, called the \emph{mission}
+phase, begins only when all threads have been started. This phase
+runs until virtual machine shutdown. Level 1 supports only two kinds
+of schedulable objects: periodic threads and sporadic events. The
+latter can be generated by either hardware or software. This
+restrictions keeps the schedulability analysis simple. In SCJ
+priority ceiling emulation is the default monitor control policy.
+The default ceiling is top priority.
+
+The Java \code{wait} and \code{notify} primitives are not allowed in
+SCJ level 0 and 1. This further simplifies analysis. The consequence
+is that a thread context switch can only occur if a higher priority
+thread is released or if the current running thread yields (in the
+case of SCJ by returning from the \code{run()} method).
+
+In the RTSJ, periodic tasks are expressed by unbounded loops with,
+at some point, a call to the \code{waitForNextPeriod()} (or
+\code{wFNP()} for short) method of class \code{RealtimeThread}. This
+has the effect of yielding control to the scheduler which will only
+wake the thread when its next period starts or shortly thereafter.
+In SCJ, as a simplification, periodic logic is encapsulated in a
+\code{run()} method which is invoked at the start of every period of
+a given schedulable object. When the thread returns from
+\code{run()} it is blocked until the next period.
+
+Listing~\ref{lst:scjdef} shows part of the definition of the SCJ
+thread classes from \cite{jop:scjava}. Listing~\ref{lst:per} shows
+the code for a periodic thread. This class has only one \code{run()}
+method which performs a periodic computation.
+
+\begin{lstlisting}[float=t,caption={A periodic application thread in SCJ},
+label=lst:per]
+
+new PeriodicThread(
+    new RelativeTime(...)) {
+
+        protected boolean run() {
+            doPeriodicWork();
+            return true;
+        }
+};
+\end{lstlisting}
+
+The loop construct with \code{wFNP()} is not used. The main
+intention to avoid the loop construct, with the possibility to split
+application logic into \emph{mini} phases, is simplification of the
+WCET analysis. Only a single method has to be analyzed per thread
+instead of all possible control flow path between \code{wFNP()}
+invocations.
+
+We contrast the SCJ threading with Listing~\ref{lst:rtsj:per} where a
+periodic RTSJ thread is shown. Suspension of the thread to wait for
+the next period is performed by an explicit invocation of
+\code{wFNP()}. The coding style in this example makes analysis of the
+code more difficult than necessary. First the initialization logic is
+mixed with the code of the mission phase, this means that a static
+analysis may be required to discover the boundary between the startup
+code and the periodic behavior. The code also performs mode switches
+with calls to \code{wFNP()} embedded in the logic. This makes the
+worst case analysis more complex as calls to \code{wFNP()} may occur
+anywhere and require deep understanding of feasible control flow
+paths.  Another issue, which does not affect correctness, is the fact
+that object references can be preserved in local variables across
+calls to \code{wFNP()}. As we will see later this has implications
+for the GC.
+
+\begin{lstlisting}[float=t,caption={Possible logic for a periodic thread in the RTSJ},
+label=lst:rtsj:per]
+
+    public void run() {
+
+        State local = new State();
+        doSomeInit();
+        local.setA();
+        waitForNextPeriod();
+
+        for (;;) {
+            while (!switchToB()) {
+                doModeAwork();
+                waitForNextPeriod();
+            }
+            local.setB();
+            while (!switchToA()) {
+                doModeBWork();
+                waitForNextPeriod();
+            }
+            local.setA();
+        }
+    }
+\end{lstlisting}
+
+The notation of a \code{run()} method that is invoked periodically
+also simplifies garbage collection (see Chapter~\ref{chap:rtgc}).
+When the GC thread is scheduled at a lower priority than the
+application threads it will never interrupt the \code{run()} method.
+The GC will only execute when all threads have returned from the
+\code{run()} method and the stack is empty. Therefore, stack scanning
+for roots can be omitted.

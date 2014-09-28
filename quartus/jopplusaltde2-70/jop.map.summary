@@ -1,0 +1,14 @@
+Analysis & Synthesis Status : Successful - Sun Jun 08 10:59:07 2014
+Quartus II 64-Bit Version : 11.0 Build 208 07/03/2011 SP 1 SJ Full Version
+Revision Name : jop
+Top-level Entity Name : jop
+Family : Cyclone II
+Total logic elements : 6,711
+    Total combinational functions : 6,069
+    Dedicated logic registers : 2,234
+Total registers : 2234
+Total pins : 115
+Total virtual pins : 0
+Total memory bits : 229,376
+Embedded Multiplier 9-bit elements : 0
+Total PLLs : 1

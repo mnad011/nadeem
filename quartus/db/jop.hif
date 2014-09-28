@@ -1,0 +1,23 @@
+Quartus II
+Version 11.0 Build 208 07/03/2011 Service Pack 1 SJ Full Version
+40
+4675
+OFF
+OFF
+OFF
+ON
+ON
+ON
+FV_OFF
+Level2
+0
+0
+VRSM_ON
+VHSM_ON
+0
+-- Start Library Paths --
+-- End Library Paths --
+-- Start VHDL Libraries --
+-- End VHDL Libraries --
+# complete
+

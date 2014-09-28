@@ -1,0 +1,288 @@
+\index{CMP}
+
+In order to generate a small and predictable processor, several
+advanced and resource-consuming features (such as instruction folding
+or branch prediction) were omitted from the design. The resulting low
+resource usage of JOP makes it possible to integrate more than one
+processor in an FPGA. Since embedded applications are naturally
+multi-threaded systems, the performance can easily be enhanced using
+a multi-processor solution.
+
+This chapter describes the configuration of a chip multiprocessor
+(CMP) version of JOP. The various SimpCon based arbiters have been
+developed by Christof Pitter and are described in \cite{jop:dma,
+jop:cmp, jop:cmp:eval}. A multi-processor JVM with shared memory
+offers research possibilities such as: scheduling of Java threads and
+synchronization between the processors or WCET analysis for the
+shared memory access.
+
+The project file to start with is \code{cyccmp}, a configuration for
+three processors with a TDMA based arbiter in the Cycore board with
+the EP1C12.
+
+\section{Memory Arbitration}
+
+A central arbiter regulates the synchronization on memory read and
+write operations.
+
+\subsection{Main Memory}
+\index{CMP!TDMA arbiter}
+
+Three different arbiter are available for the access policy to the
+main memory: priority based, fairness based, and a time division
+multiple access (TDMA) arbiter. The main memory is shared between all
+cores.
+
+The TDMA based memory arbiter provides a static schedule for the
+memory access. Therefore, access time to the memory is independent of
+tasks running on other cores. The worst-case execution time (WCET) of
+a memory loads or stores can be calculated by considering the
+worst-case phasing of the memory access pattern relative to the TDMA
+schedule \cite{tdma:arbiter:jtres2008}.
+
+
+In the default configuration each processor cores has an equally
+sized slot for the memory access. The TDMA schedule can also be
+optimized for different utilizations of processing cores. The TDMA
+schedule can be optimized to distribute slack time of tasks to other
+tasks with a tighter deadline \cite{jop:cmp:single:thread}.
+
+
+\subsection{I/O Devices}
+
+Each core contains a set of local I/O devices, needed for the runtime
+system (e.g., timer interrupt, lock support). The serial interface
+for program download and a \emph{stdio} device is connected to the
+first core.
+
+For additional I/O devices two options exist: either they are
+connected to one core, or shared by all/some cores. The first option
+is useful when the bandwidth requirement of the I/O device is high.
+As I/O devices are memory mapped they can be connected to the main
+memory arbiter in the same way as the memory controller. In that case
+the I/O devices are shared between the cores and standard
+synchronization for the access is needed. For high bandwidth demands
+a dedicated arbiter for I/O devices or even for a single device can
+be used.
+
+An interrupt line of an I/O device can be connected to a single core
+or to several cores. As interrupts can be individually disabled in
+software, a connection of all interrupt lines to all cores provides
+the most flexible solution.
+
+
+
+
+
+
+
+\section{Booting a CMP System}
+
+\index{CMP!booting}
+
+One interesting aspect of a CMP system is how the startup or boot-up
+is performed. On power-up, the FPGA starts the configuration state
+machine to read the FPGA configuration data either from a Flash
+memory or via a download cable from the PC during the development
+process. When the configuration has finished, an internal reset is
+generated. After this reset, microcode instructions are executed,
+starting from address 0. At this stage, we have not yet loaded any
+application program (Java bytecode). The first sequence in microcode
+performs this task. The Java application can be loaded from an
+external Flash memory, via a PC serial line, or an USB-port.
+
+In the next step, a minimal stack frame is generated and the special
+method \code{Startup.boot()} is invoked, even though some parts of
+the JVM are not yet setup. From now on JOP runs in Java mode. The
+method \code{boot()} performs the following steps:
+\begin{samepage}
+\begin{itemize}
+    \item Send a greeting message to \emph{stdout}
+    \item Detect the size of the main memory
+    \item Initialize the data structures for the garbage
+        collector
+    \item Initialize \code{java.lang.System}
+    \item Print out JOP's version number, detected clock speed,
+        and memory size
+    \item Invoke the static class initializers in a predefined
+        order
+    \item Invoke the \code{main} method of the application class
+\end{itemize}
+\end{samepage}
+
+The boot-up process is the same for all processors until the
+generation of the internal reset and the execution of the first
+microcode instruction. From that point on, we have to take care that
+\emph{only one} processor performs the initialization steps.
+
+All processors in the CMP are functionally identical. Only one
+processor is designated to boot-up and initialize the whole system.
+Therefore, it is necessary to distinguish between the different CPUs.
+We assign a unique CPU identity number (CPU ID) to each processor.
+Only processor CPU0 is designated to do all the boot-up and
+initialization work. The other CPUs have to wait until CPU0 completes
+the boot-up and initialization sequence. At the beginning of the
+booting sequence, CPU0 loads the Java application. Meanwhile, all
+other processors are waiting for an \emph{initialization finished}
+signal of CPU0. This busy wait is performed in microcode. When the
+other CPUs are enabled, they will run the same sequence as CPU0.
+Therefore, the initialization steps are guarded by a condition on the
+CPU ID.
+
+\section{CMP Scheduling}
+
+\index{CMP!scheduling}
+
+There are two possibilities to run multiple threads on the CMP
+system:
+
+\begin{enumerate}
+  \item A single thread per processor
+  \item Several threads on each processor
+\end{enumerate}
+
+For the configuration of one thread per processor the scheduler does
+not need to be started. Running several threads on each core is
+managed via the JOP real-time threads \code{RtThread}.
+
+The scheduler on each core is a preemptive, priority based real-time
+scheduler. As each thread gets a unique priority, no FIFO queues
+within priorities are needed. The best analyzable real-time CMP
+scheduler does not allow threads to migrate between cores. Each
+thread is pinned to a single core at creation. Therefore, standard
+scheduling analysis can be performed on a per core base. Threads
+cannot migrate from one core to another one.
+
+Similar to the uniprocessor version of JOP, the application is
+divided into an initialization phase and a mission phase. During the
+initialization phase, a predetermined core executes only one thread
+that has to create all data structures and the threads for the
+mission phase. During transition to the mission phase all created
+threads are started.
+
+The uniprocessor real-time scheduler for JOP has been enhanced to
+facilitate the scheduling of threads in the CMP configuration. Each
+core executes its own instance of the scheduler. The scheduler is
+implemented as \code{Runnable}, which is registered as an interrupt
+handler for the core local timer interrupt. The scheduling is not
+tick-based. Instead, the timer interrupt is reprogrammed after each
+scheduling decision. During the mission start, the other cores and
+timer interrupts are enabled.
+
+Another interesting option to use a CMP system is to execute exactly
+one thread per core. In this configuration scheduling overheads can
+be avoided and each core can reach an utilization of 100\% without
+missing a deadline. To explore the CMP system without a scheduler, a
+mechanism is provided to register objects, which implement the
+\code{Runnable} interface, for each core. When the other cores are
+enabled, they execute the \code{run} method of the \code{Runnable} as
+their \emph{main} method.
+
+\subsection{One Thread per Core}
+
+The first processor executes, as usual, \code{main()}. To execute
+code on the other cores a \code{Runnable} has to be registered for
+each core. After registering those Runnables the other cores need to
+be started. The code in Listing~\ref{lst:cmp:hello} shows an example
+that can be found in \dirent{test/cmp/HelloCMP.java}.
+
+\begin{lstlisting}[float=t,caption={A CMP version of Hello World},
+label=lst:cmp:hello]
+
+public class HelloCMP implements Runnable {
+
+    int id;
+    static Vector msg;
+
+    public HelloCMP(int i) {
+        id = i;
+    }
+
+    public static void main(String[] args) {
+
+        msg = new Vector();
+        System.out.println("Hello World from CPU 0");
+
+        SysDevice sys = IOFactory.getFactory().getSysDevice();
+        for (int i=0; i<sys.nrCpu-1; ++i) {
+            Runnable r = new HelloCMP(i+1);
+            Startup.setRunnable(r, i);
+        }
+
+        // start the other CPUs
+        sys.signal = 1;
+        // print their messages
+        for (;;) {
+            int size = msg.size();
+            if (size!=0) {
+                StringBuffer sb = (StringBuffer) msg.remove(0);
+                System.out.println(sb);
+            }
+        }
+    }
+
+    public void run() {
+        StringBuffer sb = new StringBuffer();
+        sb.append("Hello World from CPU ");
+        sb.append(id);
+        msg.addElement(sb);
+    }
+}
+\end{lstlisting}
+
+\subsection{Scheduling on the CMP System}
+
+Running several threads on each core is possible with \code{RtThread}
+and setting the core for each thread with
+\code{RtThread.setProcessor(nr)}. The example in
+Listing~\ref{lst:cmp:hello:rtthread}
+(\code{test/cmp/RtHelloCMP.java}) shows registering of 50 threads on
+all available cores. On \code{missionStart()} the threads are
+distributed to the cores, a scheduler for each core registered as
+timer interrupt handler, and the other cores started.
+
+\begin{lstlisting}[float=t,caption={A CMP version of Hello World with the scheduler},
+label=lst:cmp:hello:rtthread]
+
+public class RtHelloCMP extends RtThread {
+
+    public RtHelloCMP(int prio, int us) { super(prio, us); }
+
+    int id;
+    public static Vector msg;
+    final static int NR_THREADS = 50;
+
+    public static void main(String[] args) {
+        msg = new Vector();
+        System.out.println("Hello World from CPU 0");
+        SysDevice sys = IOFactory.getFactory().getSysDevice();
+        for (int i=0; i<NR_THREADS; ++i) {
+            RtHelloCMP th = new RtHelloCMP(1, 1000*1000);
+            th.id = i;
+            th.setProcessor(i%sys.nrCpu);
+        }
+        RtThread.startMission();    // start mission and other CPUs
+        for (;;) {                  // print their messages
+            RtThread.sleepMs(5);
+            int size = msg.size();
+            if (size!=0) {
+                StringBuffer sb = (StringBuffer) msg.remove(0);
+                for (int i=0; i<sb.length(); ++i) {
+                    System.out.print(sb.charAt(i));
+    }}}}
+
+    public void run() {
+        StringBuffer sb = new StringBuffer();
+        StringBuffer ping = new StringBuffer();
+        sb.append("Thread "); sb.append((char) ('A'+id)); sb.append(" start on CPU ");
+        sb.append(IOFactory.getFactory().getSysDevice().cpuId); sb.append("\r\n");
+        msg.addElement(sb);
+        waitForNextPeriod();
+        for (;;) {
+            ping.setLength(0);
+            ping.append((char) ('A'+id));
+            msg.addElement(ping);
+            waitForNextPeriod();
+    }}
+}
+\end{lstlisting}

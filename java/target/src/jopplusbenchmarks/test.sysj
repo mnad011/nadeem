@@ -1,0 +1,23 @@
+import org.pacemaker.*;
+
+reaction AtriumSensor(:
+		output boolean signal lastAtriumActivity){
+//  { // Checking atrium Activity
+		boolean s = false;
+		s = (Boolean)#lastAtriumActivity;
+//    while(true) {
+//      if(#lastAtriumActivity == false){
+//        pause;
+//      }
+//      pause;
+//    }
+//  }
+
+}
+
+pace(output boolean signal lastAtriumActivity;)->{
+
+	AtriumSensor(:lastAtriumActivity)
+	||{}
+	pause;
+}

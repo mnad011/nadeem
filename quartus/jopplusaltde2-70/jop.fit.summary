@@ -1,0 +1,16 @@
+Fitter Status : Successful - Sun Jun 08 10:59:29 2014
+Quartus II 64-Bit Version : 11.0 Build 208 07/03/2011 SP 1 SJ Full Version
+Revision Name : jop
+Top-level Entity Name : jop
+Family : Cyclone II
+Device : EP2C70F896C6
+Timing Models : Final
+Total logic elements : 6,321 / 68,416 ( 9 % )
+    Total combinational functions : 6,070 / 68,416 ( 9 % )
+    Dedicated logic registers : 2,234 / 68,416 ( 3 % )
+Total registers : 2234
+Total pins : 115 / 622 ( 18 % )
+Total virtual pins : 0
+Total memory bits : 229,376 / 1,152,000 ( 20 % )
+Embedded Multiplier 9-bit elements : 0 / 300 ( 0 % )
+Total PLLs : 1 / 4 ( 25 % )

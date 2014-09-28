@@ -1,0 +1,390 @@
+\index{method cache}
+
+Worst-case execution time (WCET) analysis \cite{pusch:maxt:jnl} of
+real-time programs is essential for any schedulability analysis. To
+provide a low WCET value, a good processor model is necessary.
+However, caches for the instructions and data is a classic example of
+the paradigm \emph{Make the common case fast}, which complicates WCET
+analysis. Avoiding or ignoring this feature in real-time systems, due
+to its unpredictable behavior, results in a very pessimistic WCET
+value. Plenty of effort has gone into research into integrating the
+instruction cache in the timing analysis of tasks \cite{Arnold1994,
+Healy1995, 225068} and the influence of the cache on task preemption
+\cite{279589, Mataix:1996}. The influence of different cache
+architectures on WCET analysis is described in
+\cite{Heckmann:IEEE2003}.
+
+We will tackle this problem from the architectural side -- an
+instruction cache organization in which simpler and more accurate
+WCET analysis is more important than average case performance.
+
+In this section, we will explore the method cache, as it is
+implemented in JOP, with a novel replacement policy. In Java bytecode
+only relative branches exist, and a method is therefore only left
+when a return instruction has been executed.\footnote{An uncaught
+exception also results in a method exit.} It has been observed that
+methods are typically short (see \cite{jop:thesis}) in Java
+applications. These properties are utilized by a cache architecture
+that stores complete methods. A complete method is loaded into the
+cache on both invocation and return. This cache fill strategy lumps
+all cache misses together and is very simple to analyze.
+
+The method cache was first presented in \cite{jop:jtres_cache} and is
+now also used by the Java processor SHAP \cite{shap:mcache}.
+Furthermore, the idea has been adapted for a processor that executes
+compiled C programs \cite{Metzlaff:SPM:2008}.
+
+\subsection{Method Cache Architecture}
+
+In this section, we will develop a solution for a time-predictable
+instruction cache. Typical Java programs consist of short methods.
+There are no branches out of the method and all branches inside are
+relative. In the described architecture, the full code of a method is
+loaded into the cache before execution. The cache is filled on
+invocations and returns. This means that all cache fills are lumped
+together with a known execution time. The full loaded method and
+relative addressing inside a method also result in a simpler cache.
+Tag memory and address translation are not necessary.
+
+In the method cache several cache blocks (similar to cache lines) are
+used for a method. The main difference from a conventional cache is
+that the blocks for a method are all loaded at once and need to be
+consecutive. Choosing the block size is now a major design decision.
+Smaller block sizes allow better memory usage, but the search time
+for a hit also increases.
+
+With varying numbers of blocks per method, an LRU replacement is
+impractical. When the method found to be LRU is smaller than the
+loaded method, this new method invalidates two cached methods.
+
+For the replacement, we will use a pointer $next$ that indicates the
+start of the blocks to be replaced on a cache miss. Two practical
+replace policies are:
+%
+\begin{description}
+\item [Next block:]At the very first beginning, $next$ points to
+    the first block. When a method of length $l$ is loaded into
+    the block $n$, $next$ is updated to
+    $(n+l)\;mod\;block\;count$. This replacement policy is
+    effectively FIFO.
+\item [Stack oriented:]$next$ is updated in the same way as before
+on a method load. It is also updated on a method return --
+independent of a resulting hit or miss -- to point to the first
+block of the leaving method.
+\end{description}
+%
+We will show the operation of these different replacement policies in
+an example with three methods: a(), b() and c() of block sizes 2, 2
+and 1. The cache consists of 4 blocks and is therefore too small to
+hold all the methods during the execution of the code fragment shown
+in Listing~\ref{lst:cache:replace}. Tables
+\ref{tab_cache_replace_next} and \ref{tab_cache_replace_stack} show
+the cache content during program execution for both replacement
+policies. The content of the cache blocks is shown after the
+execution of the invoke or return instruction. An uppercase letter
+indicates that this block has been newly loaded. A right arrow
+depicts the block to be replaced on a cache miss (the \emph{next}
+pointer). The last row shows the number of blocks that are filled
+during the execution of the program.
+
+%
+\begin{samepage}
+\begin{lstlisting}[float,caption={Code fragment for the replacement example},
+label=lst:cache:replace]
+    a() {
+        for (;;) {
+            b();
+            c();
+        }
+        ...
+    }
+\end{lstlisting}
+\end{samepage}
+%
+
+\begin{table}[t]
+    \centering
+\begin{tt}
+    \begin{tabular}{lrrrrrrrrrrr}
+    \toprule
+
+                &a()    &b()    &ret    &c()    &ret    &b()    &ret    &c()    &ret    &b()    &ret    \\
+    \midrule
+    \rm{Block 1}&A      &$\to$a &$\to$a &C      &c      &B      &b      &b      &$\to$- &B      &b      \\
+    \rm{Block 2}&A      &a      &a      &$\to$- &A      &$\to$a &$\to$a &C      &c      &B      &b      \\
+    \rm{Block 3}&$\to$- &B      &b      &b      &A      &a      &a      &$\to$- &A      &$\to$a &$\to$a \\
+    \rm{Block 4}&-      &B      &b      &b      &$\to$- &B      &b      &b      &A      &a      &a      \\
+    \midrule
+    \rm{Fill}      &2   &4      &       &5      &7      &9      &       &11     &13     &15     &       \\
+    \bottomrule
+
+    \end{tabular}
+\end{tt}
+    \caption{Next block replacement policy}
+    \label{tab_cache_replace_next}
+\end{table}
+
+\begin{table}
+    \centering
+\begin{tt}
+    \begin{tabular}{lrrrrrrrrrrr}
+    \toprule
+
+                &a()    &b()    &ret    &c()    &ret    &b()    &ret    &c()    &ret    &b()    &ret    \\
+    \midrule
+    \rm{Block 1}&A      &$\to$a &a      &a      &a      &$\to$a &a      &a      &a      &$\to$a &a      \\
+    \rm{Block 2}&A      &a      &a      &a      &a      &a      &a      &a      &a      &a      &a      \\
+    \rm{Block 3}&$\to$- &B      &$\to$b &C      &$\to$c &B      &$\to$b &C      &$\to$c &B      &$\to$b \\
+    \rm{Block 4}&-      &B      &b      &$\to$- &-      &B      &b      &$\to$- &-      &B      &b      \\
+    \midrule
+    \rm{Fill}      &2   &4      &       &5      &       &7      &       &8      &       &10     &       \\
+    \bottomrule
+
+    \end{tabular}
+\end{tt}
+    \caption{Stack oriented replacement policy}
+    \label{tab_cache_replace_stack}
+\end{table}
+
+In this example, the stack oriented approach needs fewer fills, as
+only methods b() and c() are exchanged and method a() stays in the
+cache. However, if, for example, method b() is the size of one block,
+all methods can be held in the cache using the the \emph{next block}
+policy, but b() and c() would be still exchanged using the
+\emph{stack} policy. Therefore, the first approach is used in the
+JOP's cache.
+
+
+\subsection{WCET Analysis}
+
+\label{sec:cache:wcet}
+
+The instruction cache is designed to simplify WCET analysis. Due to
+the fact that all cache misses are only included in two instructions
+(\emph{invoke} and \emph{return}), the instruction cache can be
+ignored on all other instructions. The time needed to load a complete
+method is calculated using the memory properties (latency and
+bandwidth) and the length of the method. On an invoke, the length of
+the invoked method is used, and on a return, the method length of the
+caller is used to calculate the load time.
+
+With a single method cache this calculation can be further
+simplified. For every invoke there is a corresponding return. That
+means that the time needed for the cache load on return can be
+included in the time for the invoke instruction. This is simpler
+because both methods, the caller and the callee, are known at the
+occurrence of the invoke instruction. The information about which
+method was the caller need not be stored for the return instruction
+to be analyzed.
+
+With more than one method in the cache, a cache hit detection has to
+be performed as part of the WCET analysis. If there are only two
+blocks, this is trivial, as (i) a hit on invoke is only possible if
+the method is the same as the last invoked (e.g.\ a single method in
+a loop) and (ii) a hit on return is only possible when the method is
+a leaf in the call tree. In the latter case, it is always a hit.
+
+When the cache contains more blocks (i.e.\ more than two methods can
+be cached), a part of the call tree has to be taken into account for
+hit detection. The method cache further complicates the analysis, as
+the method length also determines the cache content. However, this
+analysis is still simpler than a cache modeling of a direct-mapped
+instruction cache, as cache block replacement depends on the call
+tree instead of instruction addresses.
+
+WCET analysis of cache hits for the method cache is most beneficial
+for methods invoked in a loop, where the methods are classified as
+first miss. The basic idea of the method cache analysis is as
+follows: Within a loop it is statically analyzed if all methods
+invoked and the invoking method, which contains the loop, fit
+together in the method cache. If this is the case, all methods will
+at most miss once. The concrete implementation of the the analysis
+algorithm is described in \cite{master:huber:2009}.
+
+Except for leaf methods, the cache load can be triggered by an invoke
+instruction of by a return instruction. On an invoke some of the miss
+penalty is hidden by concurrent microcode execution. Therefore, we
+have to assume the higher cost of loading methods into the cache on a
+return instruction for non-leaf methods. Leaf nodes can naturally
+only miss on an invoke.
+
+In traditional caches, data access and instruction cache fill
+requests can compete for the main memory bus. For example, a load or
+store at the end of the processor pipeline competes with an
+instruction fetch that results in a cache miss. One of the two
+instructions is stalled for additional cycles by the other
+instruction. With a data cache, this situation can be even worse.
+The worst-case scenario for the memory stall time for an instruction
+fetch or a data load is two miss penalties when both cache reads are
+a miss. This unpredictable behavior leads to very pessimistic WCET
+bounds.
+
+A \emph{method cache}, with cache fills only on invoke and return,
+does not interfere with data access to the main memory. Data in the
+main memory is accessed with \emph{getfield} and \emph{putfield},
+instructions that never overlap with \emph{invoke} and
+\emph{return}. This property removes another uncertainty found in
+traditional cache designs.
+
+
+\subsection{Caches Compared}
+
+In this section, we compare two different cache architectures in a
+quantitative way. Although our primary concern is predictability,
+performance remains important. We will therefore first present the
+results from a conventional direct-mapped instruction cache. These
+measurements provide a baseline for the evaluation of the described
+cache architecture.
+
+Cache performance varies with different application domains. As the
+system is intended for real-time applications, the benchmark for
+these tests should reflect this fact. However, there are no standard
+benchmarks available for embedded real-time systems. A real-time
+application was therefore adapted to create this benchmark. The
+application is from one node of a distributed motor control system
+\cite{jop:wises03} (see also Section~\ref{sec:app:kfl}). A simulation
+of the environment (sensors and actors) and the communication system
+(commands from the master station) forms part of the benchmark for
+simulating the real-world workload.
+
+The data for all measurements was captured using a simulation of JOP
+and running the application for 500,000 clock cycles. During this
+time, the major loop of the application was executed several hundred
+times, effectively rendering any misses during the initialization
+code irrelevant to the measurements. As the embedded application is
+quite small (1366 LOC), small instruction caches have been simulated.
+
+WCET analysis based comparison of the method cache and of standard
+instruction caches is currently under development. Therefore, we
+perform only average case measurements for a comparison between a
+time-predictable cache organization and a standard cache
+organization. With a simulation of JOP, we measure the cache misses
+and miss penalties for different configurations of the method cache
+and a direct-mapped cache. The miss penalty and the resulting effect
+on the execution time depend on the main memory system. Therefore, we
+simulate three different memory technologies: static RAM (SRAM),
+synchronous DRAM (SDRAM), and double data rate (DDR) SDRAM. For the
+SRAM, a latency of 1 clock cycle and an access time of 2 clock cycles
+per 32-bit word are assumed. For the SDRAM, a latency of 5 cycles (3
+cycles for the row address and 2 cycles for the CAS latency) is
+assumed. The SDRAM delivers one word (4 bytes) per cycle. The DDR
+SDRAM has a shorter latency of 4.5 cycles and transfers data on both
+the rising and falling edge of the clock signal.
+
+The resulting miss cycles are scaled to the bandwidth consumed by the
+instruction fetch unit. The result is the number of cache fill cycles
+per fetched instruction byte. In other words: the average main memory
+access time in cycles per instruction byte. A value of 0.1 means that
+for every 10 fetched instruction bytes, one clock cycle is spent to
+fill the cache.
+
+\begin{table}
+    \centering
+    \caption{Direct-mapped cache, average memory access time}
+    \label{tab:direct:mapped}
+    \begin{tabular}{crccc}
+    \toprule
+
+    Cache size & \multicolumn{1}{c}{Block size} & SRAM & SDRAM & DDR \\
+
+    \midrule
+
+    1 KB & 8 B & \textbf{0.18} & 0.25 & 0.19 \\
+    1 KB & 16 B & 0.22 & \textbf{0.22} & 0.16 \\
+    1 KB & 32 B & 0.31 & 0.24 & \textbf{0.15} \\
+    \cmidrule{1-5}
+    2 KB & 8 B & \textbf{0.11} & 0.15 & 0.12 \\
+    2 KB & 16 B & 0.14 & \textbf{0.14} & \textbf{0.10} \\
+    2 KB & 32 B & 0.22 & 0.17 & 0.11 \\
+
+    \bottomrule
+
+    \end{tabular}
+\end{table}
+
+Table~\ref{tab:direct:mapped} shows the result for different
+configurations of a direct-mapped cache. Which configuration performs
+best depends on the relationship between memory bandwidth and memory
+latency. The data in bold emphasize the best block size for the
+different memory technologies. As expected, memories with a higher
+latency and bandwidth perform better with larger block sizes. For
+small block sizes, the latency clearly dominates the access time.
+Although the SRAM has half the bandwidth of the SDRAM and a quarter
+of the DDR SDRAM, it is faster than the SDRAM memories with a block
+size of 8 byte. In most cases a block size of 16 bytes is fastest.
+
+\begin{table}
+    \centering
+    \caption{Method cache, average memory access time}
+    \label{tab:mcache}
+    \begin{tabular}{crccc}
+    \toprule
+
+    Cache size & \multicolumn{1}{c}{Block size} & SRAM & SDRAM & DDR \\
+
+    \midrule
+        1 KB & 16 B & 0.36 & 0.21 & 0.12 \\
+        1 KB & 32 B & 0.36 & 0.21 & 0.12 \\
+        1 KB & 64 B & 0.36 & 0.22 & 0.12 \\
+        1 KB & 128 B & 0.41 & 0.24 & 0.14 \\
+        \cmidrule{1-5}
+        2 KB & 32 B & 0.06 & 0.04 & 0.02 \\
+        2 KB & 64 B& 0.12 & 0.08 & 0.04 \\
+        2 KB & 128 B & 0.19 & 0.11 & 0.06 \\
+        2 KB & 256 B & 0.37 & 0.22 & 0.13 \\
+    \bottomrule
+
+    \end{tabular}
+\end{table}
+
+Table~\ref{tab:mcache} shows the average memory access time per
+instruction byte for the method cache. Because we load full methods,
+we have chosen larger block sizes than for a standard cache. All
+configurations benefit from a memory system with a higher bandwidth.
+The method cache is less latency sensitive than the direct-mapped
+instruction cache. For the small 1~KB cache the access time is almost
+independent of the block size. The capacity misses dominate. From the
+2~KB configuration we see that smaller block sizes result in less
+cache misses. However, smaller block sizes result in more hardware
+for the hit detection since the method cache is in effect fully
+associatively. Therefore, we need a balance between the number of
+blocks and the performance.
+
+The cache conflict is high for the small configuration with 1~KB
+cache. The direct-mapped cache, backed up with a low-latency main
+memory, performs better than the method cache. When high-latency
+memories are used, the method cache performs better than the direct
+mapped cache. This is expected as the long latency for a transfer is
+amortized when more data (the whole method) is filled in one request.
+
+A small block size of 32 Bytes is needed in the 2~KB method cache to
+outperform the direct mapped cache with the low-latency main memory
+as represented by the SRAM. For higher latency memories (SDRAM and
+DDR), a method cache with a block size of 128 bytes outperforms the
+direct mapped instruction cache.
+
+The comparison does not show if the method cache is more easily
+predictable than other cache solutions. It shows that caching full
+methods performs similarly to standard caching techniques.
+
+
+
+\subsection{Summary}
+
+From the properties of the Java language -- usually small methods and
+relative branches -- we derived the novel idea of a \emph{method
+cache}, i.e.\ a cache organization in which whole methods are loaded
+into the cache on method invocation and the return from a method.
+This cache organization is time-predictable, as all cache misses are
+lumped together in these two instructions. Using only one block for a
+single method introduces considerable overheads in comparison with a
+conventional cache, but is very simple to analyze. We extended this
+cache to hold more methods, with several smaller blocks per method.
+
+Comparing these organizations quantitatively with a benchmark derived
+from a real-time application, we have seen that the method cache
+performs similarly to (and in some configurations even better than) a
+direct-mapped cache. Only filling the cache on method invocation and
+return simplifies WCET analysis and removes another source of
+uncertainty, as there is no competition for the main memory access
+between instruction cache and data cache.

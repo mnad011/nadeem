@@ -1,0 +1,5 @@
+<System>
+	<SubSystem Name="Top" Local="true">
+		<ClockDomain Name="CD" Class="pace"/>
+	</SubSystem>
+</System>

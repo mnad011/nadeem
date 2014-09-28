@@ -1,0 +1,178 @@
+% just for now for the printout with old title page
+\setcounter{page}{1}
+
+\begin{flushleft}
+\pagestyle{empty}
+\ \\
+\vspace{1cm}
+{\usekomafont{title}\mdseries\huge JOP Reference Handbook\\
+%\bigskip \Large Building Embedded Systems with a Java Processor
+}
+\cleardoublepage
+\end{flushleft}
+
+
+\begin{flushleft}
+\pagestyle{empty}
+\ \\
+\vspace{1cm}
+{\usekomafont{title}\Huge JOP Reference Handbook\\
+\mdseries
+{\Large Building Embedded Systems with a Java Processor}\\
+\bigskip
+\bigskip
+%{\large\itshape Beta Edition}\\
+\bigskip
+{\usekomafont{title}\huge Martin Schoeberl}
+\medskip\\
+%{\large\itshape martin@jopdesign.com}
+
+}
+
+
+%\vspace{10cm} \emph{Version: \today}
+\newpage
+\end{flushleft}
+
+
+
+
+\thispagestyle{empty}
+\begin{flushleft}
+{\small
+
+Copyright \copyright \ 2009 Martin Schoeberl
+\medskip
+
+Martin Schoeberl\\
+Strausseng. 2-10/2/55\\
+A-1050 Vienna, Austria\\
+\medskip
+
+Email: \url{martin@jopdesign.com}\\
+Visit the accompanying web site on \url{http://www.jopdesign.com/}
+and\\
+the JOP Wiki at \url{http://www.jopwiki.com/}
+\medskip
+
+%Published 2007 by Virtualbookworm.com Publishing Inc.,\\
+%P.O. Box 9949, College Station, TX 77842, US.
+Published 2009 by CreateSpace,\\
+\url{http://www.createspace.com/}
+
+
+
+\medskip
+
+%Published 2007, First edition 2008
+%\medskip
+
+All rights reserved. No part of this publication may be reproduced,
+stored in a retrieval system, or transmitted in any form or by any
+means, electronic, mechanical, recording or otherwise, without the
+prior written permission of Martin Schoeberl.
+\medskip
+
+%``JOP Reference Handbook" by Martin Schoeberl. .
+
+\textbf{Library of Congress Cataloging-in-Publication Data}
+\medskip
+
+Schoeberl, Martin
+\begin{quote}
+    JOP Reference Handbook: Building Embedded Systems\\
+    with a Java Processor / Martin Schoeberl\\
+    Includes bibliographical references and index.\\
+    ISBN 978-1438239699
+\end{quote}
+
+\bigskip
+
+
+Manufactured in the United States of America.
+
+Typeset in 11pt Times by Martin Schoeberl}
+\end{flushleft}
+
+
+\addchap{Foreword}
+
+%\code{
+
+This book is about JOP, the Java Optimized Processor. JOP is an
+implementation of the Java virtual machine (JVM) in hardware. The
+main implementation platform is a field-programmable gate array
+(FPGA). JOP began as a research project for a PhD thesis. In the mean
+time, JOP has been used in several industrial applications and as a
+research platform. JOP is a time-predictable processor for hard
+real-time systems implemented in Java.
+
+JOP is open-source under the GNU GPL and has a growing user base.
+This book is written for all of you who build this lively community.
+For a long time the PhD thesis, some research papers, and the web
+site have been the main documentation for JOP. A PhD thesis focus is
+on research results and implementation details are usually omitted.
+This book complements the thesis and provides insight into the
+implementation of JOP and the accompanying JVM. Furthermore, it gives
+you an idea how to build an embedded real-time system based on JOP.
+
+%\textbf{Martin Schoeberl} is the main developer of the Java processor
+%JOP. He has published more than 50 scientific papers on
+%time-predictable computer architectures and real-time Java. Martin
+%Schoeberl is member of the Expert Group for the Safety-Critical Java
+%Specification. Before joining the Institute of Computer Engineering
+%at the Vienna University of Technology as Assistant
+%Professor in 2005, he has been self employed with projects in the automation
+%industry. Martin Schoeberl will start as Associate Professor in
+%System-on-Chip in the Department of Informatics and Mathematical
+%Modelling at the Technical University of Denmark in early 2010.
+%
+%}
+
+\addchap{Acknowledgements}
+
+Many users of JOP contributed to the design of JOP and to the tool
+chain. I also want to thank the students at the Vienna University of
+Technology during the four years of the course ``The JVM in Hardware"
+and the students from CBS, Copenhagen at an embedded systems course
+in Java for the interesting questions and discussions. Furthermore,
+the questions and discussions in the Java processor mailing list
+provided valuable input for the documentation now available in form
+of this book. The following list of contributors to JOP is roughly in
+chronological order.
+
+Ed Anuff wrote \code{testmon.asm} to perform a memory interface test
+and \code{BlockGen.java} to convert Altera \code{.mif} files to
+Xilinx memory blocks.
+% \code{BlockGen.java} was the key tool to port JOP to Xilinx FPGAs in
+% general and the Spartan-3 specifically.
+Flavius Gruian wrote the initial version of \cmd{JOPizer} to generate
+the \code{.jop} file from the application classes. \cmd{JOPizer} is
+based on the open source library BCEL and is a substitute to the
+formerly used \code{JavaCodeCompact} from Sun. Peter Schrammel and
+Christof Pitter have implemented the first version of long bytecodes.
+Rasmus Pedersen based a class on very small information systems on
+JOP and invited my to co-teach this class in Copenhagen. During this
+time the first version of the WCET analysis tool was developed by
+Rasmus. Rasmus has also implemented an Eclipse plugin for the JOP
+design flow. Alexander Dejaco and Peter Hilber have developed the I/O
+interface board for the LEGO Mindstorms. Christof Pitter designed and
+implemented the chip-multiprocessor (CMP) version of JOP during his
+PhD thesis. Wolfgang Puffitsch first contribution to JOP was the
+finalization of the floating point library SoftFloat. Wolfgang, now
+an active developer of JOP, contributed several enhancements (e.g.,
+exceptions, HW field access, data cache,...) and works towards
+real-time garbage collection for the CMP version of JOP. Alberto
+Andriotti contributed several JVM test cases. Stefan Hepp has
+implemented an optimizer at bytecode level during his Bachelor thesis
+work. Benedikt Huber has redesigned the WCET analysis tool for JOP
+during his Master's thesis. Trevor Harmon, who implemented the WCET
+tool Volta for JOP during his PhD thesis, helped me with proofreading
+of the handbook.
+
+Furthermore, I would like to thank Walter Wilhelm from EEG for taking
+the risk to accept a JOP based hardware for the
+\emph{Kippfahrleitung} project at a very early development stage of
+JOP. The development of JOP has received funding from the Wiener
+Innovationsf\"oderprogram (Call IKT 2004) and from the EU project
+JEOPARD.
